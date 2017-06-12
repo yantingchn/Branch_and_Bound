@@ -40,9 +40,9 @@ dangling_nodes_obj = []
 
 class Node:
 	def __init__(self, x_bounds=[], freeze_var_list=[], index=0):
-		self._x_bounds = copy.deepcopy(x_bounds)
-		self._freeze_var_list = copy.deepcopy(freeze_var_list)
-		self._index = copy.deepcopy(index)
+		self._x_bounds = x_bounds
+		self._freeze_var_list = freeze_var_list
+		self._index = index
 
 		print("create Node:", index)
 		print('')
@@ -52,9 +52,18 @@ class Node:
 		self._x_bounds[index][1] = val
 		self._freeze_var_list.append(index)
 
-
 	def set_lp_res(self, res):
 		self._res = res
+
+		s = " "
+		for l in range(len(self._res['x'])):
+			if l in self._freeze_var_list:
+				s += "[" + str(self._res['x'][l]) + "] "
+			elif l in integer_var:
+				s += "\'" + str(self._res['x'][l]) + "\' "
+			else:
+				s += str(self._res['x'][l])
+		print("x: ", s)
 
 	def check_integer_var_all_solved(self, m):
 		return True if m == len(self._freeze_var_list) else False
@@ -103,16 +112,21 @@ def del_higher_val_node(z_s):
 	
 	del_list = []
 	for i in range(len(dangling_nodes_obj)):
-		if dangling_nodes_obj[i] > z_s:
+		if dangling_nodes_obj[i] >= z_s:
 			del_list.append(i)
+
+	s = ""
+	for i in del_list:
+		s += " " + str(dangling_nodes[i]._index)
+		
+	print("/***/ Remove nodes:", s)
 
 	dangling_nodes = list(np.delete(dangling_nodes, del_list))
 	dangling_nodes_obj = list(np.delete(dangling_nodes_obj, del_list))
-	if len(dangling_nodes) == 1 and dangling_nodes[0].check_integer_var_all_solved(len(integer_var)):
-		dangling_nodes = []
-		dangling_nodes_obj = []
+	# if len(dangling_nodes) == 1 and dangling_nodes[0].check_integer_var_all_solved(len(integer_var)):
+	# 	dangling_nodes = []
+	# 	dangling_nodes_obj = []
 
-	print("/***/ Remove nodes: ", del_list)
 	print("/***/ current dangling nodes: ", dangling_nodes_obj)
 	print('')
 
@@ -120,9 +134,10 @@ def del_item(index):
 	global dangling_nodes
 	global dangling_nodes_obj
 
+	print("/***/ Remove node: ", dangling_nodes[index]._index)
+
 	dangling_nodes = list(np.delete(dangling_nodes, index))
 	dangling_nodes_obj = list(np.delete(dangling_nodes_obj, index))
-	print("/***/ Remove node: ", index)
 	print("/***/ current dangling nodes: ", dangling_nodes_obj)
 	print('')
 
@@ -135,14 +150,6 @@ def check_feasibility(res):
 		raise("Problem Unbounded")
 		exit()
 
-# def check_var_integer_constraint(x_list):
-# 	not_int = []
-# 	for i in integer_var:
-# 		if x_list[i] - floor(x_list[i]) > 0:
-# 			not_int.append(i)
-
-# 	return not_int
-
 
 ######################################################
 print('')
@@ -152,43 +159,13 @@ print('')
 z_star = float('Inf')
 node_counter = 0
 sol_node = None
-#int_var_counter = 0
 
 node = Node(x_bounds, [] ,node_counter)
-node_counter += 1
-x_b  = node._x_bounds
-frez = node._freeze_var_list
-
-
-res = solve_LP(x_b)
-node.set_lp_res(res)
-
-#cand_x = check_var_integer_constraint(res['x'])
-
-lower = floor(res['x'][integer_var[0]])
-upper = lower + 1
-
-lower_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter)
-lower_node.freeze_var(integer_var[0], lower)
-add_dangling_node(lower_node)
-
-node_counter += 1
-
-upper_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter)
-upper_node.freeze_var(integer_var[0], upper)
-add_dangling_node(upper_node)
-
-node_counter += 1
-
-arbitrary_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter)
-arbitrary_node.freeze_var(integer_var[0], lower-1)
-add_dangling_node(arbitrary_node)
-
+add_dangling_node(node)
 node_counter += 1
 
 while len(dangling_nodes) > 0:
 
-	z_temp = np.amin(dangling_nodes_obj)
 	index = np.argmin(dangling_nodes_obj)
 
 	x_b  = dangling_nodes[index]._x_bounds
@@ -210,6 +187,13 @@ while len(dangling_nodes) > 0:
 	add_dangling_node(upper_node)
 
 	node_counter += 1
+
+	arbitrary_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter)
+	arbitrary_node.freeze_var(integer_var[0], lower-1)
+	add_dangling_node(arbitrary_node)
+
+	node_counter += 1
+
 	del_item(index)
 	del_higher_val_node(z_star)	
 	print("#################################")
