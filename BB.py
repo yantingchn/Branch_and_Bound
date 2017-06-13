@@ -200,7 +200,6 @@ add_dangling_node(upper_node)
 
 node_counter += 1
 
-
 while len(dangling_nodes) > 0:
 
 	index = np.argmin(dangling_nodes_obj)
