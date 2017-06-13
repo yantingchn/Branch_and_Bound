@@ -39,10 +39,11 @@ dangling_nodes_obj = []
 
 
 class Node:
-	def __init__(self, x_bounds=[], freeze_var_list=[], index=0):
+	def __init__(self, x_bounds=[], freeze_var_list=[], index=0, upper_or_lower=0):
 		self._x_bounds = x_bounds
 		self._freeze_var_list = freeze_var_list
 		self._index = index
+		self._upper_or_lower = upper_or_lower
 
 		print("create Node:", index)
 		print('')
@@ -123,9 +124,7 @@ def del_higher_val_node(z_s):
 
 	dangling_nodes = list(np.delete(dangling_nodes, del_list))
 	dangling_nodes_obj = list(np.delete(dangling_nodes_obj, del_list))
-	# if len(dangling_nodes) == 1 and dangling_nodes[0].check_integer_var_all_solved(len(integer_var)):
-	# 	dangling_nodes = []
-	# 	dangling_nodes_obj = []
+
 
 	print("/***/ current dangling nodes: ", dangling_nodes_obj)
 	print('')
@@ -150,6 +149,27 @@ def check_feasibility(res):
 		raise("Problem Unbounded")
 		exit()
 
+def check_bounds(x_b, index, u_or_l):
+	global x_bounds
+	if u_or_l == 1:
+		if x_b[index][0] is None and x_bounds[index][0] is not None:
+			return False
+		elif x_b[index][0] is not None and x_bounds[index][0] is None:
+			return True
+		elif x_b[index][0] is not None and x_bounds[index][0] is not None:
+			return False if (x_b[index][0] < x_bounds[index][0]) else True 
+	elif u_or_l == 2:
+		if x_b[index][1] is None and x_bounds[index][1] is not None:
+			return False
+		elif x_b[index][1] is not None and x_bounds[index][1] is None:
+			return True
+		elif x_b[index][0] is not None and x_bounds[index][0] is not None:
+			return False if (x_b[index][1] > x_bounds[index][1]) else True 
+	else:
+		print ("error of bounds")
+		exit()
+	
+
 
 ######################################################
 print('')
@@ -160,9 +180,26 @@ z_star = float('Inf')
 node_counter = 0
 sol_node = None
 
-node = Node(x_bounds, [] ,node_counter)
-add_dangling_node(node)
+node = Node(copy.deepcopy(x_bounds), [] ,node_counter)
+
 node_counter += 1
+res = solve_LP(x_bounds)
+
+lower = floor(res['x'][integer_var[0]])
+upper = lower + 1
+
+lower_node = Node(copy.deepcopy(x_bounds), [], node_counter, 1)
+lower_node.freeze_var(integer_var[0], lower)	
+add_dangling_node(lower_node)
+
+node_counter += 1
+
+upper_node = Node(copy.deepcopy(x_bounds), [], node_counter, 2)
+upper_node.freeze_var(integer_var[0], upper)
+add_dangling_node(upper_node)
+
+node_counter += 1
+
 
 while len(dangling_nodes) > 0:
 
@@ -173,24 +210,31 @@ while len(dangling_nodes) > 0:
 	res = dangling_nodes[index]._res
 	frez_var_index = len(frez)
 
+	u_or_l = dangling_nodes[index]._upper_or_lower
+	arbitrary_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter, copy.deepcopy(u_or_l))
+	u_or_l_b = lower-1 if (u_or_l==1) else upper+1
+	arbitrary_node.freeze_var(integer_var[frez_var_index - 1], u_or_l_b)
+	x_b_arbi = arbitrary_node._x_bounds
+	if check_bounds(x_b_arbi, integer_var[frez_var_index - 1], u_or_l):
+		add_dangling_node(arbitrary_node)
+	else:
+		print("arbitrary Node infeasibile: ", arbitrary_node._index)
+	
+	node_counter += 1
+
+
 	lower = floor(res['x'][integer_var[frez_var_index]])
 	upper = lower + 1
 
-	lower_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter)
+	lower_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter, 1)
 	lower_node.freeze_var(integer_var[frez_var_index], lower)	
 	add_dangling_node(lower_node)
 
 	node_counter += 1
 
-	upper_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter)
+	upper_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter, 2)
 	upper_node.freeze_var(integer_var[frez_var_index], upper)
 	add_dangling_node(upper_node)
-
-	node_counter += 1
-
-	arbitrary_node = Node(copy.deepcopy(x_b), copy.deepcopy(frez), node_counter)
-	arbitrary_node.freeze_var(integer_var[0], lower-1)
-	add_dangling_node(arbitrary_node)
 
 	node_counter += 1
 
